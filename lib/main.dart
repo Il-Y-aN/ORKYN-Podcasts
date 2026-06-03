@@ -848,7 +848,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 350), curve: Curves.easeInOut,
                 bottom: 0, left: 0, right: 0,
-                height: _isPlayerExpanded ? MediaQuery.of(context).size.height : 80, // Légèrement rehaussé pour le Slider
+                height: _isPlayerExpanded ? MediaQuery.of(context).size.height : 85, // Rehaussé de 75 à 85 pour la place du Slider
                 child: Container(
                   decoration: BoxDecoration(
                     color: widget.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
@@ -864,17 +864,20 @@ class _PodcastScreenState extends State<PodcastScreen> {
     );
   }
 
+  // ==========================================
+  // 🛠️ MODIFICATION PRINCIPALE ICI : LE LECTEUR DU BAS
+  // ==========================================
   Widget _buildMiniPlayer(Color titleColor) {
     return Column(
       children: [
-        // Remplacement de l'indicateur fixe par un vrai Slider interactif
+        // 1. CHANGEMENT : Ajout d'un vrai Slider cliquable pour remplacer l'ancienne barre rouge fixe
         SizedBox(
-          height: 12,
+          height: 14,
           child: SliderTheme(
             data: SliderTheme.of(context).copyWith(
               trackHeight: 3,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
               activeTrackColor: const Color(0xFFA855F7),
               inactiveTrackColor: widget.isDarkMode ? const Color(0xFF2D2D2D) : const Color(0xFFE2E8F0),
               thumbColor: const Color(0xFFA855F7),
@@ -883,7 +886,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
               min: 0.0,
               max: _dureeTotale > 0 ? _dureeTotale : 1.0,
               value: _positionActuelle.clamp(0.0, _dureeTotale > 0 ? _dureeTotale : 1.0),
-              onChanged: (val) => _changerPosition(val),
+              onChanged: (val) => _changerPosition(val), // Action de saut temporel au clic !
             ),
           ),
         ),
@@ -901,12 +904,15 @@ class _PodcastScreenState extends State<PodcastScreen> {
                 const SizedBox(width: 12),
                 Expanded(child: Text(_currentTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: titleColor))),
                 
-                // Ajout de l'affichage du temps textuel demandé par le supérieur
-                Text(
-                  '${_formaterTemps(_positionActuelle)} / ${_formaterTemps(_dureeTotale)}',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
+                // 2. CHANGEMENT : Insertion du chrono textuel "00:00 / 00:00" à droite du titre
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Text(
+                    '${_formaterTemps(_positionActuelle)} / ${_formaterTemps(_dureeTotale)}',
+                    style: TextStyle(fontSize: 12, color: widget.isDarkMode ? Colors.white70 : Colors.black54, fontWeight: FontWeight.bold),
+                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 
                 Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFA855F7).withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: Text('${_vitesseActuelle}x', style: const TextStyle(color: Color(0xFFA855F7), fontWeight: FontWeight.bold, fontSize: 12))),
                 const SizedBox(width: 8),
