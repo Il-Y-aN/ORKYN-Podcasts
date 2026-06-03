@@ -865,11 +865,13 @@ class _PodcastScreenState extends State<PodcastScreen> {
   }
 
   Widget _buildMiniPlayer(Color titleColor) {
-    final double progression = _dureeTotale > 0 ? (_positionActuelle / _dureeTotale).clamp(0.0, 1.0) : 0.0;
+    // SÉCURITÉ CRASH : Si la durée est à 0.0 ou invalide, on force la progression à 0.0 au lieu de faire un crash NaN / Infinity
+    final double progression = (_dureeTotale > 0.0 && !_dureeTotale.isNaN && !_dureeTotale.isInfinite) 
+        ? (_positionActuelle / _dureeTotale).clamp(0.0, 1.0) 
+        : 0.0;
 
     return Stack(
       children: [
-        // Le contenu principal du lecteur (Aligné au centre vertical)
         Padding(
           padding: const EdgeInsets.only(top: 4.0, left: 16.0, right: 16.0),
           child: Row(
@@ -882,12 +884,10 @@ class _PodcastScreenState extends State<PodcastScreen> {
               ),
               const SizedBox(width: 12),
               
-              // Titre du Podcast
               Expanded(
                 child: Text(_currentTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: titleColor)),
               ),
               
-              // ⏱️ LE CHRONO : Ajouté en plein milieu à côté du titre
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12.0),
                 child: Text(
@@ -907,11 +907,10 @@ class _PodcastScreenState extends State<PodcastScreen> {
         
         Positioned(
           top: 0, left: 0, right: 0,
-          height: 10, // Zone de clic élargie pour le confort du doigt/souris
+          height: 10, 
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapDown: (TapDownDetails details) {
-              // Récupération de la largeur de l'écran pour calculer l'endroit exact du clic
               final double largeurTotale = MediaQuery.of(context).size.width;
               final double clicX = details.globalPosition.dx;
               if (largeurTotale > 0 && _dureeTotale > 0) {
@@ -921,12 +920,10 @@ class _PodcastScreenState extends State<PodcastScreen> {
             },
             child: Stack(
               children: [
-                // Fond de la barre
                 Container(
                   width: double.infinity, height: 3,
                   color: widget.isDarkMode ? const Color(0xFF2D2D2D) : const Color(0xFFE2E8F0),
                 ),
-                // Remplissage de la progression violette
                 FractionallySizedBox(
                   alignment: Alignment.topLeft,
                   widthFactor: progression,
