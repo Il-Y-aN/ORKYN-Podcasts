@@ -624,6 +624,9 @@ class _PodcastScreenState extends State<PodcastScreen> {
               IconButton(icon: const Icon(Icons.forward_10_rounded), onPressed: () => _changerPosition(_positionActuelle + 10.0)),
               const SizedBox(width: 8),
 
+              // ==========================================
+              // MÀJ 2 : BOUTON DES VITESSES SUR LE LECTEUR DU BAS (Cyclique)
+              // ==========================================
               GestureDetector(
                 onTap: () {
                   int indexActuel = _vitessesDisponibles.indexOf(_vitesseActuelle);
@@ -654,14 +657,17 @@ class _PodcastScreenState extends State<PodcastScreen> {
           ),
         ),
 
+        // ==========================================
+        // MÀJ 1 : LIGNE DE LECTURE ULTRA-PRATIQUE (Hitbox confortable de 40px)
+        // ==========================================
         Positioned(
           top: -18, left: 0, right: 0, height: 40,
           child: SliderTheme(
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 0.0), 
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 0.0, pressedThumbRadius: 0.0),
+            data: SliderTheme.of(context).copyWith(
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 0.0), // Correction : uniquement enabledThumbRadius pour le mini-player
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 0.0),
               trackHeight: 3.0, 
-              activeTrackColor: const Color(0xFFA855F7), // Aux couleurs violettes de ton application
+              activeTrackColor: const Color(0xFFA855F7), 
               inactiveTrackColor: Colors.grey.withOpacity(0.2),
             ),
             child: Slider(
@@ -688,11 +694,25 @@ class _PodcastScreenState extends State<PodcastScreen> {
             const SizedBox(height: 24),
             Text(_currentTitle, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: titleColor)),
             const SizedBox(height: 8),
-            Expanded(child: SingleChildScrollView(child: Text(_currentDescription, style: TextStyle(fontSize: 13, color: subTitleColor)))),
+            
+            // ==========================================
+            // FIX DESCRIPTION : Hauteur verrouillée à 80px pour garantir son affichage constant
+            // ==========================================
+            SizedBox(
+              height: 80, 
+              child: SingleChildScrollView(
+                child: Text(_currentDescription, style: TextStyle(fontSize: 13, color: subTitleColor)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            
             Slider(activeColor: const Color(0xFFA855F7), value: _positionActuelle.clamp(0.0, _dureeTotale > 0 ? _dureeTotale : 1.0), max: _dureeTotale > 0 ? _dureeTotale : 1.0, onChanged: (v) => _changerPosition(v)),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(_formaterTemps(_positionActuelle)), Text(_formaterTemps(_dureeTotale))]),
             const SizedBox(height: 16),
 
+            // ==========================================
+            // MÀJ 3 : TAPIS DE VITESSE CAPSULE PERFECT CENTRÉ & AUX COULEURS DE L'APP
+            // ==========================================
             Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
