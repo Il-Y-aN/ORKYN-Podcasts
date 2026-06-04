@@ -394,14 +394,13 @@ class _PodcastScreenState extends State<PodcastScreen> {
     }
   }
 
-  // Pop-up d'authentification demandant le code secret
   void _demanderCodeAdmin({DocumentSnapshot? docAModifier}) {
     final TextEditingController codeController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: widget.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-        title: Text(docAModifier == null ? "🔑 Espace Publication Admin" : "✏️ Mode Édition Admin"),
+        title: Text(docAModifier == null ? "🔑 Espace Publication" : "✏️ Mode Édition Admin"),
         content: TextField(
           controller: codeController,
           obscureText: true,
@@ -544,7 +543,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
                     ),
                   ),
                 ),
-                // 🛠️ BOUTON PARAMÈTRES SUR CHAQUE JAQUETTE HORIZONTALE
+                // ⚙️ ENGRENAGE MODIF SUR LES JAQUETTES HORIZONTALES
                 Positioned(
                   top: 8, left: 8,
                   child: GestureDetector(
@@ -613,7 +612,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
                       children: [
                         Expanded(child: Text(titre, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: titleColor))),
                         
-                        // 🛠️ BOUTON PARAMÈTRES SUR CHAQUE LIGNE VERTICALE
+                        // ⚙️ ENGRENAGE MODIF SUR LES LIGNES VERTICALES
                         IconButton(
                           padding: EdgeInsets.zero, constraints: const BoxConstraints(),
                           icon: const Icon(Icons.settings_rounded, color: Colors.grey, size: 20),
@@ -718,8 +717,8 @@ class _PodcastScreenState extends State<PodcastScreen> {
                         backgroundColor: barColor, elevation: 2, surfaceTintColor: barColor,
                         leading: IconButton(
                           icon: const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFF94A3B8)),
-                          tooltip: "Espace Admin",
-                          onPressed: () => _demanderCodeAdmin(), // Création de podcast vide
+                          tooltip: "Ajouter un podcast",
+                          onPressed: () => _demanderCodeAdmin(), 
                         ),
                         title: RichText(
                           text: const TextSpan(
@@ -895,7 +894,6 @@ class _PodcastScreenState extends State<PodcastScreen> {
   }
 
   Widget _buildMiniPlayer(Color titleColor) {
-    // Évite le crash mathématique main.dart.js lié à la division par zéro
     final double progression = (_dureeTotale > 0.0 && !_dureeTotale.isNaN && !_dureeTotale.isInfinite) 
         ? (_positionActuelle / _dureeTotale).clamp(0.0, 1.0) 
         : 0.0;
@@ -1059,12 +1057,9 @@ class _PodcastScreenState extends State<PodcastScreen> {
   }
 }
 
-// ====================================================================
-// 🛠️ FORMULAIRE UNIQUE INTELLIGENT : AJOUT OU MODIFICATION/SUPPRESSION
-// ====================================================================
 class AdminUploadScreen extends StatefulWidget {
   final bool isDarkMode;
-  final DocumentSnapshot? podcastDoc; // Si null = Ajout, si rempli = Modification/Suppression
+  final DocumentSnapshot? podcastDoc; 
   const AdminUploadScreen({super.key, required this.isDarkMode, this.podcastDoc});
 
   @override
@@ -1083,7 +1078,6 @@ class _AdminUploadScreenState extends State<AdminUploadScreen> {
   @override
   void initState() {
     super.initState();
-    // Si un document est passé en paramètre, on pré-remplit le formulaire automatiquement
     if (widget.podcastDoc != null) {
       final data = widget.podcastDoc!.data() as Map<String, dynamic>;
       _titleController.text = data['Titre'] ?? data['titre'] ?? '';
@@ -1119,11 +1113,9 @@ class _AdminUploadScreenState extends State<AdminUploadScreen> {
 
     try {
       if (widget.podcastDoc == null) {
-        // Mode Création classique
         await FirebaseFirestore.instance.collection('podcasts').add(data);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(backgroundColor: Colors.green, content: Text("Podcast ajouté avec succès ! 🎉")));
       } else {
-        // Mode Édition d'un podcast ciblé
         await FirebaseFirestore.instance.collection('podcasts').doc(widget.podcastDoc!.id).update(data);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(backgroundColor: Colors.blue, content: Text("Podcast modifié avec succès ! ✏️")));
       }
@@ -1228,7 +1220,6 @@ class _AdminUploadScreenState extends State<AdminUploadScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                         ),
-                        // Affichage du bouton de suppression uniquement en mode édition
                         if (widget.podcastDoc != null) ...[
                           const SizedBox(height: 16),
                           ElevatedButton.icon(
