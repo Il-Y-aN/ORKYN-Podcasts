@@ -497,11 +497,11 @@ class _PodcastScreenState extends State<PodcastScreen> {
   }
 
   /// =================================================================
-  /// 🛠️ LES 3 COMPOSANTS MODERNISÉS AVEC TYPES COMPATIBLES WEB STREAMS
+  /// 🔍 BLOC DES 3 MISES À JOUR (Isolées, Typées et Sécurisées)
   /// =================================================================
 
-  /// 1. LA LIGNE D'ÉCOUTE AMÉLIORÉE (Hitbox globale de 40px - Multi-plateforme)
-  Widget _buildBarreProgressionForteSensibilite() {
+  /// MÀJ 1 : La Ligne d'écoute (Hitbox élargie de 40px)
+  Widget _buildBarreProgressionHauteSensibilite() {
     return SliderTheme(
       data: SliderTheme.of(context).copyWith(
         thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0, pressedThumbRadius: 9.0),
@@ -513,21 +513,21 @@ class _PodcastScreenState extends State<PodcastScreen> {
         overlayColor: const Color(0xFF9D57FF).withOpacity(0.2),
       ),
       child: Container(
-        height: 40.0, // Zone tactile supérieure pour attraper le clic
+        height: 40.0, 
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 4.0),
         child: Slider(
           min: 0.0,
           max: _dureeTotale > 0.0 ? _dureeTotale : 1.0,
           value: _positionActuelle.clamp(0.0, _dureeTotale > 0.0 ? _dureeTotale : 1.0),
-          onChanged: (value) => _changerPosition(value),
+          onChanged: (double value) => _changerPosition(value),
         ),
       ),
     );
   }
 
-  /// 2. LE TAPIS DE VITESSE EN CAPSULE SOMBRE (6 Vitesses Alignées)
-  Widget _buildTapisVitessesComplet() {
+  /// MÀJ 2 : Le Tapis de vitesse en Capsule Sombre (6 Boutons Alignés)
+  Widget _buildTapisVitessesCapsule() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -540,7 +540,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: _vitessesDisponibles.map((v) {
+            children: _vitessesDisponibles.map((double v) {
               final bool isSelected = _vitesseActuelle == v;
               return GestureDetector(
                 onTap: () => _selectionnerVitesse(v),
@@ -574,8 +574,8 @@ class _PodcastScreenState extends State<PodcastScreen> {
     );
   }
 
-  /// 3. LE BOUTON DE VITESSE INTERACTIF CYCLIQUE
-  Widget _buildBoutonVitesseInteractif() {
+  /// MÀJ 3 : Le Bouton de vitesse Interactif Cyclique
+  Widget _buildBoutonVitesseCyclique() {
     return GestureDetector(
       onTap: () {
         int indexActuel = _vitessesDisponibles.indexOf(_vitesseActuelle);
@@ -628,11 +628,11 @@ class _PodcastScreenState extends State<PodcastScreen> {
           top: 0, left: 0, right: 0, height: 10,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTapDown: (details) {
+            onTapDown: (TapDownDetails details) {
               if (_dureeTotale > 0) {
-                final double largeurTotale = MediaQuery.of(context).size.width;
-                final double cibleClic = (details.globalPosition.dx / largeurTotale).clamp(0.0, 1.0);
-                _changerPosition(cibleClic * _dureeTotale);
+                final double largeurEcran = MediaQuery.of(context).size.width;
+                final double positionRelative = (details.globalPosition.dx / largeurEcran).clamp(0.0, 1.0);
+                _changerPosition(positionRelative * _dureeTotale);
               }
             },
             child: Stack(children: [Container(width: double.infinity, height: 3, color: Colors.grey.withOpacity(0.2)), Container(height: 3, width: MediaQuery.of(context).size.width * progression, color: const Color(0xFFA855F7))]),
@@ -656,14 +656,14 @@ class _PodcastScreenState extends State<PodcastScreen> {
             const SizedBox(height: 8),
             Expanded(child: SingleChildScrollView(child: Text(_currentDescription, style: TextStyle(fontSize: 13, color: subTitleColor)))),
             
-            // INTÉGRATION MÀJ 1 : Remplacement par la ligne d'écoute à forte sensibilité
-            _buildBarreProgressionForteSensibilite(),
+            // MÀJ 1 : Injection de ta barre d'écoute confort 40px
+            _buildBarreProgressionHauteSensibilite(),
             
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(_formaterTemps(_positionActuelle)), Text(_formaterTemps(_dureeTotale))]),
             const SizedBox(height: 20),
             
-            // INTÉGRATION MÀJ 2 : Ajout du tapis déroulant en capsule alignée
-            _buildTapisVitessesComplet(),
+            // MÀJ 2 : Injection de ta capsule tapis de vitesse déroulant
+            _buildTapisVitessesCapsule(),
             const SizedBox(height: 20),
             
             Row(
@@ -676,8 +676,8 @@ class _PodcastScreenState extends State<PodcastScreen> {
                 IconButton(icon: const Icon(Icons.forward_10_rounded, size: 36), onPressed: () => _changerPosition(_positionActuelle + 10.0)),
                 const SizedBox(width: 24),
                 
-                // INTÉGRATION MÀJ 3 : Ajout du bouton de vitesse interactif cyclique
-                _buildBoutonVitesseInteractif(),
+                // MÀJ 3 : Injection de ton bouton de vitesse interactif cyclique
+                _buildBoutonVitesseCyclique(),
               ],
             )
           ],
