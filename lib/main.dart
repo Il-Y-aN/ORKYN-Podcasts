@@ -496,108 +496,110 @@ class _PodcastScreenState extends State<PodcastScreen> {
     );
   }
 
-  /// =================================================================
-  /// 🔍 BLOC DES 3 MISES À JOUR (Isolées, Typées et Sécurisées)
-  /// =================================================================
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted && !_searchFocusNode.hasFocus) _globalFocusNode.requestFocus(); });
+    final Color cardColor = widget.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
+    final Color barColor = widget.isDarkMode ? const Color(0xFF1A1A1A) : Colors.white;
+    final Color searchFieldColor = widget.isDarkMode ? const Color(0xFF2D2D2D) : const Color(0xFFF1F5F9);
+    final Color titleColor = widget.isDarkMode ? Colors.white : const Color(0xFF0F172A);
+    final Color subTitleColor = widget.isDarkMode ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
-  /// MÀJ 1 : La Ligne d'écoute (Hitbox élargie de 40px)
-  Widget _buildBarreProgressionHauteSensibilite() {
-    return SliderTheme(
-      data: SliderTheme.of(context).copyWith(
-        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0, pressedThumbRadius: 9.0),
-        overlayShape: const RoundSliderOverlayShape(overlayRadius: 18.0),
-        trackHeight: 4.0, 
-        activeTrackColor: const Color(0xFF9D57FF), 
-        inactiveTrackColor: Colors.white.withOpacity(0.15),
-        thumbColor: const Color(0xFF9D57FF),
-        overlayColor: const Color(0xFF9D57FF).withOpacity(0.2),
-      ),
-      child: Container(
-        height: 40.0, 
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 4.0),
-        child: Slider(
-          min: 0.0,
-          max: _dureeTotale > 0.0 ? _dureeTotale : 1.0,
-          value: _positionActuelle.clamp(0.0, _dureeTotale > 0.0 ? _dureeTotale : 1.0),
-          onChanged: (double value) => _changerPosition(value),
-        ),
-      ),
-    );
-  }
-
-  /// MÀJ 2 : Le Tapis de vitesse en Capsule Sombre (6 Boutons Alignés)
-  Widget _buildTapisVitessesCapsule() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E222B), 
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: _vitessesDisponibles.map((double v) {
-              final bool isSelected = _vitesseActuelle == v;
-              return GestureDetector(
-                onTap: () => _selectionnerVitesse(v),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFF9D57FF).withOpacity(0.2) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected ? const Color(0xFF9D57FF) : Colors.transparent, 
-                      width: 1.5
-                    ),
-                  ),
-                  child: Text(
-                    "${v}x",
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.grey.withOpacity(0.7),
-                      fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        const SizedBox(height: 2),
-        const Icon(Icons.arrow_drop_up, color: Color(0xFF9D57FF), size: 18),
-      ],
-    );
-  }
-
-  /// MÀJ 3 : Le Bouton de vitesse Interactif Cyclique
-  Widget _buildBoutonVitesseCyclique() {
-    return GestureDetector(
-      onTap: () {
-        int indexActuel = _vitessesDisponibles.indexOf(_vitesseActuelle);
-        int prochainIndex = (indexActuel + 1) % _vitessesDisponibles.length;
-        _selectionnerVitesse(_vitessesDisponibles[prochainIndex]);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E222B), 
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+    return KeyboardListener(
+      focusNode: _globalFocusNode, onKeyEvent: _gererClavier,
+      child: Scaffold(
+        body: Stack(
           children: [
-            Text(
-              "${_vitesseActuelle}x",
-              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+            Container(
+              decoration: BoxDecoration(gradient: widget.isDarkMode ? const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1A1A1A), Color(0xFF121212)]) : const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFF4F7F9), Color(0xFFE5EBF0)])),
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _podcastsStream,
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                  final tousLesDocs = snapshot.data!.docs;
+                  final Set<String> themesUniques = {"Tous"};
+                  for (var doc in tousLesDocs) {
+                    final d = doc.data() as Map<String, dynamic>;
+                    if (d['Theme'] != null) themesUniques.add(d['Theme'].toString().trim());
+                  }
+
+                  final listeFiltree = tousLesDocs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final bool correspondRecherche = data['Titre'].toString().toLowerCase().contains(_rechercheTexte.toLowerCase()) || data['Description'].toString().toLowerCase().contains(_rechercheTexte.toLowerCase());
+                    final bool correspondCategorie = _categorieSelectionnee == "Tous" || data['Theme'] == _categorieSelectionnee;
+                    final bool correspondFavoris = !_afficherUniquementFavoris || _podcastsLikesIds.contains(doc.id);
+                    return correspondRecherche && correspondCategorie && correspondFavoris;
+                  }).toList();
+
+                  bool aDesNouveautes = html.window.localStorage['last_check'] != null && tousLesDocs.isNotEmpty;
+
+                  return CustomScrollView(
+                    slivers: [
+                      SliverAppBar(
+                        floating: true, pinned: true, centerTitle: true, backgroundColor: barColor, elevation: 2,
+                        leading: IconButton(icon: const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFF94A3B8)), onPressed: () => _demanderCodeAdmin()),
+                        title: RichText(text: const TextSpan(children: [TextSpan(text: "ORKYN' ", style: TextStyle(color: Color(0xFFA855F7), fontWeight: FontWeight.bold, fontSize: 20)), TextSpan(text: "Podcasts", style: TextStyle(color: Color(0xFF0EA5E9), fontSize: 20))])),
+                        actions: [
+                          Stack(children: [IconButton(icon: Icon(Icons.notifications_rounded, color: aDesNouveautes ? const Color(0xFF0EA5E9) : const Color(0xFF475569)), onPressed: () => _ouvrirNotifications(tousLesDocs)), if (aDesNouveautes) Positioned(top: 10, right: 10, child: Container(width: 9, height: 9, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)))]),
+                          IconButton(icon: Icon(widget.isDarkMode ? Icons.wb_sunny_rounded : Icons.nightlight_round, color: widget.isDarkMode ? Colors.amber : const Color(0xFF475569)), onPressed: () => widget.onThemeChanged(!widget.isDarkMode)),
+                          IconButton(icon: const Icon(Icons.logout_rounded, color: Colors.redAccent), onPressed: () { _audioElement?.pause(); widget.onLogout(); }),
+                        ],
+                      ),
+                      SliverToBoxAdapter(
+                        child: Container(
+                          color: barColor, padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  height: 45, decoration: BoxDecoration(color: searchFieldColor, borderRadius: BorderRadius.circular(12)),
+                                  child: TextField(
+                                    controller: _searchController, focusNode: _searchFocusNode, style: TextStyle(color: widget.isDarkMode ? Colors.white : Colors.black),
+                                    onChanged: (value) => setState(() { _rechercheTexte = value; }),
+                                    decoration: InputDecoration(hintText: 'Rechercher...', prefixIcon: const Icon(Icons.search_rounded), suffixIcon: _rechercheTexte.isNotEmpty ? IconButton(icon: const Icon(Icons.clear_rounded), onPressed: () => setState(() { _searchController.clear(); _rechercheTexte = ""; })) : null, border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(vertical: 11)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(icon: Icon(_afficherUniquementFavoris ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: Colors.redAccent), onPressed: () => setState(() { _afficherUniquementFavoris = !_afficherUniquementFavoris; })),
+                              Container(
+                                height: 45, padding: const EdgeInsets.symmetric(horizontal: 12), decoration: BoxDecoration(color: widget.isDarkMode ? const Color(0xFF2E1A47) : const Color(0xFFF5F3FF), borderRadius: BorderRadius.circular(12)),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: _categorieSelectionnee, dropdownColor: widget.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+                                    onChanged: (v) { if (v != null) setState(() { _categorieSelectionnee = v; }); },
+                                    items: themesUniques.map((t) => DropdownMenuItem(value: t, child: Text(t, style: TextStyle(color: widget.isDarkMode ? Colors.white : Colors.black)))).toList(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (_categorieSelectionnee == "Tous" && _rechercheTexte.isEmpty && !_afficherUniquementFavoris) ...[
+                        const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(left: 24.0, top: 24.0, bottom: 12.0), child: Text('✨ Nouveautés / Derniers ajouts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)))),
+                        SliverToBoxAdapter(child: SizedBox(height: 220, child: ListView.builder(scrollDirection: Axis.horizontal, padding: const EdgeInsets.only(left: 24.0), itemCount: listeFiltree.length, itemBuilder: (context, index) => _buildPodcastCardHorizontal(listeFiltree[listeFiltree.length - 1 - index], cardColor, titleColor, subTitleColor)))),
+                        const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(left: 24.0, top: 28.0, bottom: 12.0), child: Text('🔥 Sélection Orkyn\'', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)))),
+                        SliverToBoxAdapter(child: SizedBox(height: 220, child: ListView.builder(scrollDirection: Axis.horizontal, padding: const EdgeInsets.only(left: 24.0), itemCount: listeFiltree.length > 3 ? 3 : listeFiltree.length, itemBuilder: (context, index) => _buildPodcastCardHorizontal(listeFiltree[index], cardColor, titleColor, subTitleColor)))),
+                        const SliverToBoxAdapter(child: SizedBox(height: 120)),
+                      ] else ...[
+                        SliverList(delegate: SliverChildBuilderDelegate((context, index) => _buildPodcastCardVertical(listeFiltree[index], cardColor, titleColor, subTitleColor), childCount: listeFiltree.length)),
+                        const SliverToBoxAdapter(child: SizedBox(height: 120)),
+                      ]
+                    ],
+                  );
+                },
+              ),
             ),
-            const SizedBox(width: 4),
-            const Icon(Icons.speed, color: Color(0xFF9D57FF), size: 16),
+            if (_currentPlayingUrl != null)
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 350), bottom: 0, left: 0, right: 0,
+                height: _isPlayerExpanded ? MediaQuery.of(context).size.height : 75,
+                child: Container(
+                  decoration: BoxDecoration(color: widget.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 15, offset: const Offset(0, -4))]),
+                  child: _isPlayerExpanded ? _buildFullPlayer(titleColor, subTitleColor) : _buildMiniPlayer(titleColor), 
+                ),
+              ),
           ],
         ),
       ),
@@ -605,7 +607,6 @@ class _PodcastScreenState extends State<PodcastScreen> {
   }
 
   Widget _buildMiniPlayer(Color titleColor) {
-    final double progression = (_dureeTotale > 0.0 && !_dureeTotale.isNaN) ? (_positionActuelle / _dureeTotale).clamp(0.0, 1.0) : 0.0;
     return Stack(
       children: [
         Padding(
@@ -621,21 +622,54 @@ class _PodcastScreenState extends State<PodcastScreen> {
               IconButton(icon: const Icon(Icons.replay_10_rounded), onPressed: () => _changerPosition(_positionActuelle - 10.0)),
               IconButton(icon: Icon(_isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded, size: 38, color: const Color(0xFFA855F7)), onPressed: () => _gererLecture(_currentPlayingUrl!)),
               IconButton(icon: const Icon(Icons.forward_10_rounded), onPressed: () => _changerPosition(_positionActuelle + 10.0)),
+              const SizedBox(width: 8),
+
+              GestureDetector(
+                onTap: () {
+                  int indexActuel = _vitessesDisponibles.indexOf(_vitesseActuelle);
+                  int prochainIndex = (indexActuel + 1) % _vitessesDisponibles.length;
+                  _selectionnerVitesse(_vitessesDisponibles[prochainIndex]);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E222B), 
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "${_vitesseActuelle}x",
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(Icons.speed, color: Color(0xFF9D57FF), size: 12),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
+
         Positioned(
-          top: 0, left: 0, right: 0, height: 10,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: (TapDownDetails details) {
-              if (_dureeTotale > 0) {
-                final double largeurEcran = MediaQuery.of(context).size.width;
-                final double positionRelative = (details.globalPosition.dx / largeurEcran).clamp(0.0, 1.0);
-                _changerPosition(positionRelative * _dureeTotale);
-              }
-            },
-            child: Stack(children: [Container(width: double.infinity, height: 3, color: Colors.grey.withOpacity(0.2)), Container(height: 3, width: MediaQuery.of(context).size.width * progression, color: const Color(0xFFA855F7))]),
+          top: -18, left: 0, right: 0, height: 40,
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 0.0),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 0.0),
+              trackHeight: 3.0, 
+              activeTrackColor: const Color(0xFFA855F7),
+              inactiveTrackColor: Colors.grey.withOpacity(0.2),
+            ),
+            child: Slider(
+              min: 0.0,
+              max: _dureeTotale > 0 ? _dureeTotale : 1.0,
+              value: _positionActuelle.clamp(0.0, _dureeTotale > 0 ? _dureeTotale : 1.0),
+              onChanged: (v) => _changerPosition(v),
+            ),
           ),
         ),
       ],
@@ -655,29 +689,72 @@ class _PodcastScreenState extends State<PodcastScreen> {
             Text(_currentTitle, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: titleColor)),
             const SizedBox(height: 8),
             Expanded(child: SingleChildScrollView(child: Text(_currentDescription, style: TextStyle(fontSize: 13, color: subTitleColor)))),
-            
-            // MÀJ 1 : Injection de ta barre d'écoute confort 40px
-            _buildBarreProgressionHauteSensibilite(),
-            
+            Slider(activeColor: const Color(0xFFA855F7), value: _positionActuelle.clamp(0.0, _dureeTotale > 0 ? _dureeTotale : 1.0), max: _dureeTotale > 0 ? _dureeTotale : 1.0, onChanged: (v) => _changerPosition(v)),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(_formaterTemps(_positionActuelle)), Text(_formaterTemps(_dureeTotale))]),
-            const SizedBox(height: 20),
-            
-            // MÀJ 2 : Injection de ta capsule tapis de vitesse déroulant
-            _buildTapisVitessesCapsule(),
-            const SizedBox(height: 20),
-            
+            const SizedBox(height: 16),
+
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFA855F7), // Le violet officiel de ton application !
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFA855F7).withOpacity(0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        )
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min, // Contraint l'alignement et force le centrage au pixel près
+                      children: _vitessesDisponibles.map((v) {
+                        final bool isSelected = _vitesseActuelle == v;
+                        return GestureDetector(
+                          onTap: () => _selectionnerVitesse(v),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              // La pilule devient blanche lorsqu'elle est active pour trancher sur le violet
+                              color: isSelected ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              "${v}x",
+                              style: TextStyle(
+                                // Texte violet si sélectionné, blanc translucide sinon
+                                color: isSelected ? const Color(0xFFA855F7) : Colors.white.withOpacity(0.9),
+                                fontSize: 13,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Icon(
+                    Icons.arrow_drop_up,
+                    color: Color(0xFFA855F7), // Flèche assortie au thème général
+                    size: 18,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IconButton(icon: const Icon(Icons.replay_10_rounded, size: 36), onPressed: () => _changerPosition(_positionActuelle - 10.0)),
-                const SizedBox(width: 16),
                 IconButton(icon: Icon(_isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded, size: 64, color: const Color(0xFFA855F7)), onPressed: () => _gererLecture(_currentPlayingUrl!)),
-                const SizedBox(width: 16),
                 IconButton(icon: const Icon(Icons.forward_10_rounded, size: 36), onPressed: () => _changerPosition(_positionActuelle + 10.0)),
-                const SizedBox(width: 24),
-                
-                // MÀJ 3 : Injection de ton bouton de vitesse interactif cyclique
-                _buildBoutonVitesseCyclique(),
               ],
             )
           ],
