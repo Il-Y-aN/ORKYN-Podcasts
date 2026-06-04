@@ -412,7 +412,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
             onPressed: () {
               if (codeController.text == "AdminOrkyn2026") {
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (context) => AdminUploadScreen(isDarkMode: widget.isDarkMode)));
+                Navigator.push(context, MaterialPageRoute(builder: (context) => AdminDashboard(isDarkMode: widget.isDarkMode)));
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Code Admin incorrect ❌")));
               }
@@ -480,7 +480,6 @@ class _PodcastScreenState extends State<PodcastScreen> {
     final String audioUrl = podcast['audio_url'] ?? podcast['audioUrl'] ?? '';
     final String imageUrl = podcast['image_url'] ?? podcast['imageUrl'] ?? '';
     final String titre = podcast['Titre'] ?? podcast['titre'] ?? 'Sans titre';
-    final String description = podcast['Description'] ?? podcast['description'] ?? 'Pas de description';
     final bool isLiked = _podcastsLikesIds.contains(idDocument);
 
     return Container(
@@ -544,7 +543,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
                 children: [
                   Text(titre, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: titleColor)),
                   const SizedBox(height: 4),
-                  Text(description, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: subTitleColor, height: 1.2)),
+                  Text(podcast['Description'] ?? podcast['description'] ?? 'Pas de description', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: subTitleColor, height: 1.2)),
                 ],
               ),
             )
@@ -559,7 +558,6 @@ class _PodcastScreenState extends State<PodcastScreen> {
     final String imageUrl = podcast['image_url'] ?? podcast['imageUrl'] ?? '';
     final String titre = podcast['Titre'] ?? podcast['titre'] ?? 'Sans titre';
     final String theme = podcast['Theme'] ?? podcast['theme'] ?? 'Général';
-    final String description = podcast['Description'] ?? podcast['description'] ?? 'Pas de description';
     final bool isLiked = _podcastsLikesIds.contains(idDocument);
 
     return Padding(
@@ -610,7 +608,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text(description, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: subTitleColor, height: 1.2)),
+                    Text(podcast['Description'] ?? podcast['description'] ?? 'Pas de description', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: subTitleColor, height: 1.2)),
                   ],
                 ),
               ),
@@ -865,7 +863,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
   }
 
   Widget _buildMiniPlayer(Color titleColor) {
-    // SÉCURITÉ CRASH : Si la durée est à 0.0 ou invalide, on force la progression à 0.0 au lieu de faire un crash NaN / Infinity
+    // SÉCURITÉ : Protection stricte contre la division par zéro (évite le crash main.dart.js NaN/Infinity)
     final double progression = (_dureeTotale > 0.0 && !_dureeTotale.isNaN && !_dureeTotale.isInfinite) 
         ? (_positionActuelle / _dureeTotale).clamp(0.0, 1.0) 
         : 0.0;
@@ -880,7 +878,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
               const SizedBox(width: 8),
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: _currentImageUrl.isNotEmpty ? Image.network(_currentImageUrl, width: 40, height: 40, fit: BoxFit.cover) : Container(color: Colors.purple.withOpacity(0.2), width: 40, height: 40, child: const Icon(Icons.music_note, size: 20, color: Color(0xFFA855F7))),
+                child: _currentImageUrl.isNotEmpty ? Image.network(_currentImageUrl, width: 40, height: 40, fit: BoxFit.cover, errorBuilder: (_,__,___)=>const Icon(Icons.music_note)) : Container(color: Colors.purple.withOpacity(0.2), width: 40, height: 40, child: const Icon(Icons.music_note, size: 20, color: Color(0xFFA855F7))),
               ),
               const SizedBox(width: 12),
               
@@ -888,6 +886,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
                 child: Text(_currentTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: titleColor)),
               ),
               
+              // ⏱️ LE CHRONO : Intégré nativement dans la barre de contrôle
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12.0),
                 child: Text(
@@ -905,6 +904,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
           ),
         ),
         
+        // 🎛️ LA BARRE DE PROGRESSION ENTIÈREMENT CLIQUABLE
         Positioned(
           top: 0, left: 0, right: 0,
           height: 10, 
@@ -1033,54 +1033,116 @@ class _PodcastScreenState extends State<PodcastScreen> {
   }
 }
 
-class AdminUploadScreen extends StatefulWidget {
+// --- TABLEAU DE BORD ADMIN : AJOUT, MODIF ET SUPPRESSION ---
+class AdminDashboard extends StatefulWidget {
   final bool isDarkMode;
-  const AdminUploadScreen({super.key, required this.isDarkMode});
+  const AdminDashboard({super.key, required this.isDarkMode});
 
   @override
-  State<AdminUploadScreen> createState() => _AdminUploadScreenState();
+  State<AdminDashboard> createState() => _AdminDashboardState();
 }
 
-class _AdminUploadScreenState extends State<AdminUploadScreen> {
+class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   final _formKey = GlobalKey<FormState>();
+  
   final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  final _descController = TextEditingController();
   final _themeController = TextEditingController();
-  final _audioUrlController = TextEditingController();
-  final _imageUrlController = TextEditingController();
-  bool _enCoursEnvoi = false;
+  final _audioController = TextEditingController();
+  final _imageController = TextEditingController();
+  
+  String? _editingId;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _titleController.dispose();
-    _descriptionController.dispose();
+    _descController.dispose();
     _themeController.dispose();
-    _audioUrlController.dispose();
-    _imageUrlController.dispose();
+    _audioController.dispose();
+    _imageController.dispose();
     super.dispose();
   }
 
-  void _publierPodcast() async {
-    if (!_formKey.currentState!.validate()) return;
+  void _resetForm() {
+    _editingId = null;
+    _titleController.clear();
+    _descController.clear();
+    _themeController.clear();
+    _audioController.clear();
+    _imageController.clear();
+  }
 
-    setState(() { _enCoursEnvoi = true; });
+  void _preRemplir(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    _editingId = doc.id;
+    _titleController.text = data['Titre'] ?? data['titre'] ?? '';
+    _descController.text = data['Description'] ?? data['description'] ?? '';
+    _themeController.text = data['Theme'] ?? data['theme'] ?? '';
+    _audioController.text = data['audio_url'] ?? data['audioUrl'] ?? '';
+    _imageController.text = data['image_url'] ?? data['imageUrl'] ?? '';
+    _tabController.animateTo(0); // Revient sur l'onglet d'édition
+    setState(() {});
+  }
+
+  void _sauvegarder() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+    
+    final data = {
+      'Titre': _titleController.text.trim(),
+      'Description': _descController.text.trim(),
+      'Theme': _themeController.text.trim().isEmpty ? 'Général' : _themeController.text.trim(),
+      'audio_url': _audioController.text.trim(),
+      'image_url': _imageController.text.trim().isEmpty ? 'https://picsum.photos/id/101/400/400' : _imageController.text.trim(),
+      'date_ajout': FieldValue.serverTimestamp(),
+    };
 
     try {
-      await FirebaseFirestore.instance.collection('podcasts').add({
-        'Titre': _titleController.text.trim(),
-        'Description': _descriptionController.text.trim(),
-        'Theme': _themeController.text.trim().isEmpty ? 'Général' : _themeController.text.trim(),
-        'audio_url': _audioUrlController.text.trim(),
-        'image_url': _imageUrlController.text.trim().isEmpty ? 'https://picsum.photos/id/101/400/400' : _imageUrlController.text.trim(),
-        'date_ajout': FieldValue.serverTimestamp(),
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(backgroundColor: Colors.green, content: Text("Podcast ajouté avec succès ! 🎉")));
-      Navigator.pop(context); 
+      if (_editingId == null) {
+        await FirebaseFirestore.instance.collection('podcasts').add(data);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(backgroundColor: Colors.green, content: Text("Podcast publié avec succès ! 🎉")));
+      } else {
+        await FirebaseFirestore.instance.collection('podcasts').doc(_editingId).update(data);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(backgroundColor: Colors.blue, content: Text("Podcast modifié avec succès ! ✏️")));
+      }
+      _resetForm();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: Colors.red, content: Text("Erreur d'envoi : $e")));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: Colors.red, content: Text("Erreur Firebase : $e")));
     } finally {
-      setState(() { _enCoursEnvoi = false; });
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _supprimer(String id) async {
+    bool? confirm = await showDialog(
+      context: context, 
+      builder: (c) => AlertDialog(
+        backgroundColor: widget.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        title: const Text("⚠️ Supprimer définitivement ?"),
+        content: const Text("Êtes-vous sûr de vouloir effacer cet épisode ? Cette action est irréversible."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text("Annuler")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(c, true), 
+            child: const Text("Supprimer"),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm == true) {
+      await FirebaseFirestore.instance.collection('podcasts').doc(id).delete();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(backgroundColor: Colors.orange, content: Text("Podcast supprimé de la base.")));
     }
   }
 
@@ -1088,65 +1150,87 @@ class _AdminUploadScreenState extends State<AdminUploadScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Ajouter un Podcast"),
+        title: const Text("Dashboard Gestion Admin"),
         backgroundColor: widget.isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: const Color(0xFFA855F7),
+          labelColor: const Color(0xFFA855F7),
+          tabs: const [
+            Tab(icon: Icon(Icons.edit_note_rounded), text: "Publication / Édition"),
+            Tab(icon: Icon(Icons.layers_clear_rounded), text: "Liste / Suppression"),
+          ],
+        ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text("Formulaire de publication rapide", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              const Text("Le podcast sera instantanément disponible pour tous les collaborateurs.", style: TextStyle(color: Colors.grey, fontSize: 13)),
-              const SizedBox(height: 24),
-              TextFormField(
-                controller: _titleController,
-                decoration: InputDecoration(labelText: "Titre du podcast *", prefixIcon: const Icon(Icons.title_rounded), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                validator: (v) => v == null || v.trim().isEmpty ? "Champ obligatoire" : null,
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // ONGLET 1 : FORMULAIRE CREATION / EDITION
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(_editingId == null ? "Formulaire d'ajout rapide" : "Mode modification actif ✏️", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  TextFormField(controller: _titleController, decoration: InputDecoration(labelText: "Titre du podcast *", border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
+                  const SizedBox(height: 16),
+                  TextFormField(controller: _descController, maxLines: 3, decoration: InputDecoration(labelText: "Description de l'épisode *", border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
+                  const SizedBox(height: 16),
+                  TextFormField(controller: _themeController, decoration: InputDecoration(labelText: "Thème / Catégorie (ex: RH, IA, Formation)", border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
+                  const SizedBox(height: 16),
+                  TextFormField(controller: _audioController, decoration: InputDecoration(labelText: "URL du fichier audio (.mp3) *", border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
+                  const SizedBox(height: 16),
+                  TextFormField(controller: _imageController, decoration: InputDecoration(labelText: "URL de l'image jaquette (Optionnel)", border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
+                  const SizedBox(height: 24),
+                  _isLoading 
+                      ? const Center(child: CircularProgressIndicator(color: Color(0xFFA855F7))) 
+                      : ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFA855F7), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+                          onPressed: _sauvegarder, 
+                          child: Text(_editingId == null ? "Publier le podcast" : "Sauvegarder les modifications", style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                  if (_editingId != null) 
+                    TextButton(onPressed: () => setState(() => _resetForm()), child: const Text("Annuler les modifications en cours", style: TextStyle(color: Colors.grey))),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _descriptionController,
-                maxLines: 3,
-                decoration: InputDecoration(labelText: "Description / Notes de l'épisode *", prefixIcon: const Icon(Icons.description_rounded), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                validator: (v) => v == null || v.trim().isEmpty ? "Champ obligatoire" : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _themeController,
-                decoration: InputDecoration(labelText: "Thème / Catégorie (ex: RH, Formation, Sécurité)", prefixIcon: const Icon(Icons.label_rounded), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _audioUrlController,
-                decoration: InputDecoration(labelText: "URL du fichier audio (.mp3) *", hintText: "https://example.com/audio.mp3", prefixIcon: const Icon(Icons.audiotrack_rounded), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                validator: (v) => v == null || v.trim().isEmpty ? "Champ obligatoire" : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _imageUrlController,
-                decoration: InputDecoration(labelText: "URL de la jaquette/image (Optionnel)", hintText: "https://example.com/image.jpg", prefixIcon: const Icon(Icons.image_rounded), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-              ),
-              const SizedBox(height: 32),
-              _enCoursEnvoi
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFFA855F7)))
-                  : ElevatedButton.icon(
-                      onPressed: _publierPodcast,
-                      icon: const Icon(Icons.cloud_upload_rounded),
-                      label: const Text("Publier le podcast", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFA855F7),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          
+          // ONGLET 2 : LISTE DES PODCASTS FIRESTORE POUR MODIF / SUPPR
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('podcasts').orderBy('date_ajout', descending: true).snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+              final docs = snapshot.data!.docs;
+              if (docs.isEmpty) return const Center(child: Text("Aucun épisode présent dans votre base Firestore."));
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: docs.length,
+                itemBuilder: (context, index) {
+                  final doc = docs[index];
+                  final data = doc.data() as Map<String, dynamic>;
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    child: ListTile(
+                      title: Text(data['Titre'] ?? data['titre'] ?? 'Sans titre', style: const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text(data['Theme'] ?? data['theme'] ?? 'Général'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(icon: const Icon(Icons.mode_edit_outline_rounded, color: Colors.blue), onPressed: () => _preRemplir(doc)),
+                          IconButton(icon: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent), onPressed: () => _supprimer(doc.id)),
+                        ],
                       ),
                     ),
-            ],
+                  );
+                },
+              );
+            },
           ),
-        ),
+        ],
       ),
     );
   }
