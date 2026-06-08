@@ -7,12 +7,13 @@ import 'dart:convert';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Initialisation directe et robuste pour Flutter Web
   await Firebase.initializeApp(
     options: const FirebaseOptions(
       apiKey: "AIzaSyD0sExmKe5-NTzfdW-dAnmGvB9kGQWp8rE",
       authDomain: "al-podcasts.firebaseapp.com",
       projectId: "al-podcasts",
-      storageBucket: "al-podcasts.firebasestorage.app", // Initialisation directe et robuste pour Flutter Web 2026
+      storageBucket: "al-podcasts.firebasestorage.app",
       messagingSenderId: "1084059668245",
       appId: "1:1084059668245:web:22025c16163513148ae31c",
     ),
@@ -220,8 +221,10 @@ class _PodcastScreenState extends State<PodcastScreen> {
   bool _isPlayerExpanded = false;
   final List<double> _vitessesDisponibles = const [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
+  // Gestion de la vue Album de la série
   Map<String, dynamic>? _serieSelectionneeData;
-  List<DocumentSnapshot> _episodesDeLaSerieEnCours = [];
+  List<DocumentSnapshot> _chapitresDeLaSerie = [];
+  DocumentSnapshot? _grosPodcastIntegral;
 
   @override
   void initState() {
@@ -271,6 +274,52 @@ class _PodcastScreenState extends State<PodcastScreen> {
     if (_audioElement != null) { _audioElement!.playbackRate = _vitesseActuelle; }
   }
 
+  void _clicSurPodcast(Map<String, dynamic> podcastData, List<QueryDocumentSnapshot> tousLesPodcasts) {
+    final String titre = (podcastData['Titre'] ?? '').toString();
+    final String audioUrl = podcastData['audio_url'] ?? '';
+
+    // SI LE TITRE CONTIENT "[Série]", ALORS C'EST LE GROS PODCAST DE "MANAGEMENT"
+    if (titre.contains('[Série]')) {
+      final String themeSerie = podcastData['Theme'] ?? 'management';
+      
+      // Récupérer l'intégralité des podcasts rattachés à ce thème
+      final List<DocumentSnapshot> tousLesMorceaux = tousLesPodcasts.where((doc) {
+        final d = doc.data() as Map<String, dynamic>;
+        return (d['Theme'] ?? '') == themeSerie;
+      }).toList();
+
+      // Isoler le gros podcast complet pour la tête d'affiche
+      DocumentSnapshot? integralDoc;
+      final List<DocumentSnapshot> listeChapitres Uniquement = [];
+
+      for (var doc in tousLesMorceaux) {
+        final d = doc.data() as Map<String, dynamic>;
+        if (d['Titre'].toString().contains('[Série]')) {
+          integralDoc = doc;
+        } else {
+          listeChapitresUniquement.add(doc);
+        }
+      }
+
+      // Trier les chapitres par ordre chronologique de publication (date_ajout)
+      listeChapitresUniquement.sort((a, b) {
+        final dA = (a.data() as Map<String, dynamic>)['date_ajout'] as Timestamp?;
+        final dB = (b.data() as Map<String, dynamic>)['date_ajout'] as Timestamp?;
+        if (dA == null || dB == null) return 0;
+        return dA.compareTo(dB);
+      });
+
+      setState(() {
+        _serieSelectionneeData = podcastData;
+        _grosPodcastIntegral = integralDoc;
+        _chapitresDeLaSerie = listeChapitresUniquement;
+      });
+    } else {
+      // PODCAST NORMAL SANS ALBUM : LECTURE DIRECTE
+      if (audioUrl.isNotEmpty) _gererLecture(audioUrl, podcastData);
+    }
+  }
+
   void _gererLecture(String url, [Map<String, dynamic>? data]) {
     if (_isPlaying && _currentPlayingUrl == url) {
       _audioElement?.pause();
@@ -309,13 +358,14 @@ class _PodcastScreenState extends State<PodcastScreen> {
       });
       _audioElement?.onEnded.listen((event) {
         if (mounted) { 
-          int indexActuel = _episodesDeLaSerieEnCours.indexWhere((doc) {
+          // AUTO-PLAY INTELLIGENT CHRONOLOGIQUE DES CHAPITRES
+          int indexActuel = _chapitresDeLaSerie.indexWhere((doc) {
             final data = doc.data() as Map<String, dynamic>;
             return (data['audio_url'] ?? '') == _currentPlayingUrl;
           });
 
-          if (indexActuel != -1 && indexActuel + 1 < _episodesDeLaSerieEnCours.length) {
-            final prochainDoc = _episodesDeLaSerieEnCours[indexActuel + 1];
+          if (indexActuel != -1 && indexActuel + 1 < _chapitresDeLaSerie.length) {
+            final prochainDoc = _chapitresDeLaSerie[indexActuel + 1];
             final prochainData = prochainDoc.data() as Map<String, dynamic>;
             final prochaineUrl = prochainData['audio_url'] ?? '';
             if (prochaineUrl.isNotEmpty) {
@@ -412,30 +462,12 @@ class _PodcastScreenState extends State<PodcastScreen> {
     );
   }
 
-  void _ouvrirVueAlbumSerie(Map<String, dynamic> podcastData, List<QueryDocumentSnapshot> tousLesPodcasts) {
-    final String themeSerie = podcastData['Theme'] ?? 'Général';
-    
-    final List<DocumentSnapshot> listeEpisodes = tousLesPodcasts.where((doc) {
-      final d = doc.data() as Map<String, dynamic>;
-      return (d['Theme'] ?? '') == themeSerie;
-    }).toList();
-
-    listeEpisodes.sort((a, b) {
-      final tA = (a.data() as Map<String, dynamic>)['Titre']?.toString() ?? '';
-      final tB = (b.data() as Map<String, dynamic>)['Titre']?.toString() ?? '';
-      return tA.compareTo(tB);
-    });
-
-    setState(() {
-      _serieSelectionneeData = podcastData;
-      _episodesDeLaSerieEnCours = listeEpisodes;
-    });
-  }
-
   Widget _buildPodcastCardHorizontal(DocumentSnapshot doc, Color cardColor, Color titleColor, Color subTitleColor, List<QueryDocumentSnapshot> tousLesPodcasts) {
     final Map<String, dynamic> podcast = doc.data() as Map<String, dynamic>;
+    final String audioUrl = podcast['audio_url'] ?? '';
     final String imageUrl = podcast['image_url'] ?? '';
     final bool isLiked = _podcastsLikesIds.contains(doc.id);
+    final bool estUneSerie = (podcast['Titre'] ?? '').toString().contains('[Série]');
 
     return Container(
       width: 240, margin: const EdgeInsets.only(right: 16),
@@ -448,13 +480,21 @@ class _PodcastScreenState extends State<PodcastScreen> {
             Stack(
               children: [
                 GestureDetector(
-                  onTap: () => _ouvrirVueAlbumSerie(podcast, tousLesPodcasts),
+                  onTap: () => _clicSurPodcast(podcast, tousLesPodcasts),
                   child: Container(
                     height: 130, width: double.infinity,
                     decoration: BoxDecoration(color: const Color(0xFF1E293B), image: DecorationImage(image: NetworkImage(imageUrl.isNotEmpty ? imageUrl : 'https://picsum.photos/id/101/300/300'), fit: BoxFit.cover)),
                     child: Container(
-                      color: Colors.black.withOpacity(0.1),
-                      child: const Center(child: Icon(Icons.album_rounded, color: Colors.white, size: 45)),
+                      color: _currentPlayingUrl == audioUrl && _isPlaying ? Colors.black.withOpacity(0.4) : Colors.black.withOpacity(0.1),
+                      child: Center(
+                        child: Icon(
+                          estUneSerie 
+                              ? Icons.album_rounded 
+                              : (_currentPlayingUrl == audioUrl && _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded), 
+                          color: Colors.white, 
+                          size: 45
+                        )
+                      ),
                     ),
                   ),
                 ),
@@ -481,8 +521,10 @@ class _PodcastScreenState extends State<PodcastScreen> {
 
   Widget _buildPodcastCardVertical(DocumentSnapshot doc, Color cardColor, Color titleColor, Color subTitleColor, List<QueryDocumentSnapshot> tousLesPodcasts) {
     final Map<String, dynamic> podcast = doc.data() as Map<String, dynamic>;
+    final String audioUrl = podcast['audio_url'] ?? '';
     final String imageUrl = podcast['image_url'] ?? '';
     final bool isLiked = _podcastsLikesIds.contains(doc.id);
+    final bool estUneSerie = (podcast['Titre'] ?? '').toString().contains('[Série]');
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -494,13 +536,19 @@ class _PodcastScreenState extends State<PodcastScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               GestureDetector(
-                onTap: () => _ouvrirVueAlbumSerie(podcast, tousLesPodcasts),
+                onTap: () => _clicSurPodcast(podcast, tousLesPodcasts),
                 child: Container(
                   width: 90, height: 90,
                   decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(12), image: DecorationImage(image: NetworkImage(imageUrl.isNotEmpty ? imageUrl : 'https://picsum.photos/id/101/300/300'), fit: BoxFit.cover)),
                   child: Container(
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.black.withOpacity(0.1)),
-                    child: const Icon(Icons.album_rounded, color: Colors.white, size: 36),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: _currentPlayingUrl == audioUrl && _isPlaying ? Colors.black.withOpacity(0.4) : Colors.black.withOpacity(0.1)),
+                    child: Icon(
+                      estUneSerie 
+                          ? Icons.album_rounded 
+                          : (_currentPlayingUrl == audioUrl && _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded), 
+                      color: Colors.white, 
+                      size: 36
+                    ),
                   ),
                 ),
               ),
@@ -563,8 +611,9 @@ class _PodcastScreenState extends State<PodcastScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          Center(child: Text(titreSerie, textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: titleColor))),
+          Center(child: Text(titreSerie.toUpperCase(), textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: titleColor))),
           const SizedBox(height: 8),
+          // La description générale ne s'affiche qu'ici en haut
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(descriptionSerie, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: subTitleColor, height: 1.4)),
@@ -572,11 +621,36 @@ class _PodcastScreenState extends State<PodcastScreen> {
           const SizedBox(height: 24),
           
           Divider(color: Colors.grey.withOpacity(0.1)),
-          
           const SizedBox(height: 12),
-          Text("ÉPISODES DISPONIBLES (${_episodesDeLaSerieEnCours.length})", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: subTitleColor, letterSpacing: 1.2)),
+
+          // ==========================================
+          // EN-TÊTE : LE GROS PODCAST INTÉGRAL EN TÊTE D'AFFICHE
+          // ==========================================
+          if (_grosPodcastIntegral != null) ...[
+            Text("ÉMISSION COMPLÈTE (INTÉGRALE)", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: subTitleColor, letterSpacing: 1.2)),
+            const SizedBox(height: 10),
+            Builder(builder: (context) {
+              final data = _grosPodcastIntegral!.data() as Map<String, dynamic>;
+              final String url = data['audio_url'] ?? '';
+              final bool enCours = _currentPlayingUrl == url;
+              return Card(
+                color: enCours ? const Color(0xFFA855F7).withOpacity(0.15) : const Color(0xFFA855F7).withOpacity(0.05),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFA855F7), width: 1)),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  leading: Icon(enCours && _isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded, color: const Color(0xFFA855F7), size: 36),
+                  title: Text(data['Titre'] ?? 'Podcast Intégral', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: enCours ? const Color(0xFFA855F7) : titleColor)),
+                  subtitle: const Text("Écouter la slide en entier", style: TextStyle(fontSize: 12)),
+                  onTap: () { if (url.isNotEmpty) _gererLecture(url, data); },
+                ),
+              );
+            }),
+            const SizedBox(height: 24),
+          ],
+
+          Text("CHAPITRES DE LA SLIDE (${_chapitresDeLaSerie.length})", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: subTitleColor, letterSpacing: 1.2)),
           const SizedBox(height: 12),
-          ..._episodesDeLaSerieEnCours.map((doc) {
+          ..._chapitresDeLaSerie.map((doc) {
             final ep = doc.data() as Map<String, dynamic>;
             final String url = ep['audio_url'] ?? '';
             final bool enCours = _currentPlayingUrl == url;
