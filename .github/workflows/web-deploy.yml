@@ -5,16 +5,21 @@ on:
     branches:
       - main
 
-# Autorise le script à publier directement sur GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
 jobs:
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps: deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -23,9 +28,16 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          architecture: x64
+
+      - name: Install dependencies
+        run: flutter pub get
 
       - name: Build Web Application
-        run: flutter build web --base-href "/ORKYN-Podcasts/" --no-wasm-dry-run
+        run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -33,4 +45,5 @@ jobs:
           path: build/web
 
       - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4

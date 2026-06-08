@@ -7,7 +7,6 @@ import 'dart:convert';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Initialisation directe et robuste pour Flutter Web
   await Firebase.initializeApp(
     options: const FirebaseOptions(
       apiKey: "AIzaSyD0sExmKe5-NTzfdW-dAnmGvB9kGQWp8rE",
@@ -98,8 +97,6 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   final _emailController = TextEditingController();
-  
-  // FIX LIGNE 101 : Correction du nom de la classe de contrôle
   final _passwordController = TextEditingController();
   String _message = "";
   final String _motDePasseSecretOrkyn = "Orkyn2026!"; 
@@ -379,8 +376,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
     );
   }
 
-  // FIX : Typage explicite WebStreams pour éviter l'erreur de compilation
-  void _ouvrirNotifications(List<QueryDocumentSnapshot<Map<String, dynamic>>> podcasts) {
+  void _ouvrirNotifications(List<QueryDocumentSnapshot> podcasts) {
     setState(() { html.window.localStorage['last_check'] = DateTime.now().toIso8601String(); });
     showDialog(
       context: context,
@@ -396,7 +392,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
               : ListView.builder(
                   shrinkWrap: true, itemCount: podcasts.length > 5 ? 5 : podcasts.length,
                   itemBuilder: (context, index) {
-                    final data = podcasts[podcasts.length - 1 - index].data();
+                    final data = podcasts[podcasts.length - 1 - index].data() as Map<String, dynamic>;
                     return Card(
                       color: widget.isDarkMode ? const Color(0xFF2D2D2D) : const Color(0xFFF1F5F9),
                       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -416,11 +412,11 @@ class _PodcastScreenState extends State<PodcastScreen> {
     );
   }
 
-  void _ouvrirVueAlbumSerie(Map<String, dynamic> podcastData, List<QueryDocumentSnapshot<Map<String, dynamic>>> tousLesPodcasts) {
+  void _ouvrirVueAlbumSerie(Map<String, dynamic> podcastData, List<QueryDocumentSnapshot> tousLesPodcasts) {
     final String themeSerie = podcastData['Theme'] ?? 'Général';
     
     final List<DocumentSnapshot> listeEpisodes = tousLesPodcasts.where((doc) {
-      final d = doc.data();
+      final d = doc.data() as Map<String, dynamic>;
       return (d['Theme'] ?? '') == themeSerie;
     }).toList();
 
@@ -436,7 +432,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
     });
   }
 
-  Widget _buildPodcastCardHorizontal(DocumentSnapshot doc, Color cardColor, Color titleColor, Color subTitleColor, List<QueryDocumentSnapshot<Map<String, dynamic>>> tousLesPodcasts) {
+  Widget _buildPodcastCardHorizontal(DocumentSnapshot doc, Color cardColor, Color titleColor, Color subTitleColor, List<QueryDocumentSnapshot> tousLesPodcasts) {
     final Map<String, dynamic> podcast = doc.data() as Map<String, dynamic>;
     final String imageUrl = podcast['image_url'] ?? '';
     final bool isLiked = _podcastsLikesIds.contains(doc.id);
@@ -483,7 +479,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
     );
   }
 
-  Widget _buildPodcastCardVertical(DocumentSnapshot doc, Color cardColor, Color titleColor, Color subTitleColor, List<QueryDocumentSnapshot<Map<String, dynamic>>> tousLesPodcasts) {
+  Widget _buildPodcastCardVertical(DocumentSnapshot doc, Color cardColor, Color titleColor, Color subTitleColor, List<QueryDocumentSnapshot> tousLesPodcasts) {
     final Map<String, dynamic> podcast = doc.data() as Map<String, dynamic>;
     final String imageUrl = podcast['image_url'] ?? '';
     final bool isLiked = _podcastsLikesIds.contains(doc.id);
@@ -575,7 +571,6 @@ class _PodcastScreenState extends State<PodcastScreen> {
           ),
           const SizedBox(height: 24),
           
-          // FIX OPACITY LIGNE 585 : Remplacement par une déclaration de couleur standardisée
           Divider(color: Colors.grey.withOpacity(0.1)),
           
           const SizedBox(height: 12),
@@ -622,20 +617,19 @@ class _PodcastScreenState extends State<PodcastScreen> {
               decoration: BoxDecoration(gradient: widget.isDarkMode ? const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1A1A1A), Color(0xFF121212)]) : const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFF4F7F9), Color(0xFFE5EBF0)])),
               child: StreamBuilder<QuerySnapshot>(
                 stream: _podcastsStream,
-                // FIX TYPE : Attribution du type explicite Map dynamique pour le stream
-                builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+                builder: (context, snapshot) {
                   if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
                   
-                  final tousLesDocs = snapshot.data!.docs.cast<QueryDocumentSnapshot<Map<String, dynamic>>>();
+                  final tousLesDocs = snapshot.data!.docs;
                   
                   final Set<String> themesUniques = {"Tous"};
                   for (var doc in tousLesDocs) {
-                    final d = doc.data();
+                    final d = doc.data() as Map<String, dynamic>;
                     if (d['Theme'] != null) themesUniques.add(d['Theme'].toString().trim());
                   }
 
                   final listeFiltree = tousLesDocs.where((doc) {
-                    final data = doc.data();
+                    final data = doc.data() as Map<String, dynamic>;
                     final bool correspondRecherche = data['Titre'].toString().toLowerCase().contains(_rechercheTexte.toLowerCase()) || data['Description'].toString().toLowerCase().contains(_rechercheTexte.toLowerCase());
                     final bool correspondCategorie = _categorieSelectionnee == "Tous" || data['Theme'] == _categorieSelectionnee;
                     final bool correspondFavoris = !_afficherUniquementFavoris || _podcastsLikesIds.contains(doc.id);
@@ -773,7 +767,6 @@ class _PodcastScreenState extends State<PodcastScreen> {
           top: -18, left: 0, right: 0, height: 40,
           child: SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              // FIX : Uniquement enabledThumbRadius spécifié
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 0.0), 
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 0.0),
               trackHeight: 3.0, 
@@ -818,13 +811,6 @@ class _PodcastScreenState extends State<PodcastScreen> {
                     decoration: BoxDecoration(
                       color: const Color(0xFFA855F7), 
                       borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFA855F7).withOpacity(0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        )
-                      ],
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min, 
@@ -851,12 +837,6 @@ class _PodcastScreenState extends State<PodcastScreen> {
                         );
                       }).toList(),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  const Icon(
-                    Icons.arrow_drop_up,
-                    color: Color(0xFFA855F7), 
-                    size: 18,
                   ),
                 ],
               ),
