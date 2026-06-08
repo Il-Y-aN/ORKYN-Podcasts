@@ -221,7 +221,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
   bool _isPlayerExpanded = false;
   final List<double> _vitessesDisponibles = const [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
-  // Gestion de la vue Album de la série
+  // Vue Album
   Map<String, dynamic>? _serieSelectionneeData;
   List<DocumentSnapshot> _chapitresDeLaSerie = [];
   DocumentSnapshot? _grosPodcastIntegral;
@@ -298,13 +298,24 @@ class _PodcastScreenState extends State<PodcastScreen> {
         }
       }
 
-      // ==========================================
-      // CORRECTION DU TRI : Tri par nom de Partie (Titre) de 1 à 9
-      // ==========================================
+      // =======================================================
+      // ALGORITHME DE TRI NUMÉRIQUE STRICT PAR FIN DE TITRE (Partie X)
+      // =======================================================
       listeChapitres.sort((a, b) {
         final tA = (a.data() as Map<String, dynamic>)['Titre']?.toString() ?? '';
         final tB = (b.data() as Map<String, dynamic>)['Titre']?.toString() ?? '';
-        return tA.compareTo(tB);
+        
+        // Fonction interne pour extraire le dernier chiffre du titre
+        int extraireNumeroPartie(String titreComplet) {
+          final RegExp regChiffre = RegExp(r'\d+$'); // Cherche le nombre à la toute fin du texte
+          final match = regChiffre.search(titreComplet.trim());
+          if (match != null) {
+            return int.tryParse(match.group(0) ?? '0') ?? 0;
+          }
+          return 0; // Retourne 0 si aucun chiffre n'est détecté
+        }
+
+        return extraireNumeroPartie(tA).compareTo(extraireNumeroPartie(tB));
       });
 
       setState(() {
