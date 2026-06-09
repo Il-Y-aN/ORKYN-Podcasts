@@ -44,3 +44,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 !.github/
+
+# ==========================================
+# EXCEPTION SÉCURISÉE POUR TES PODCASTS AUDIO
+# ==========================================
+!web/assets/
+!web/assets/*
